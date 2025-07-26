@@ -1,0 +1,12 @@
+---
+data:
+  - id: 1
+    name: Franc
+    roles:
+      - admin
+      - hr
+  - id: 2
+    name: John
+    roles:
+      - admin
+      - finance

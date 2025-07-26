@@ -1,0 +1,7 @@
+author: "Tom"
+database:
+  driver: "newdriver"
+  port: 6601 # hello
+  dbname: 'newdb'
+  username: "appuser"
+  password: "apppassword"
