@@ -8,6 +8,10 @@ import java.util.*;
  */
 public record YamlObject(List<Node> nodes) {
 
+    public YamlObject {
+        Objects.requireNonNull(nodes);
+    }
+
     /**
      * Finds a value via JSON Path like structure to avoid collision that usually occurs with
      * raw separators such as slashes and dots
