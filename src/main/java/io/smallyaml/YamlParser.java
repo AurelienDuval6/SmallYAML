@@ -4,7 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -27,8 +28,9 @@ public final class YamlParser {
     }
 
     public static YamlObject parse(InputStream inputStream) {
-
-        var root = YamlObject.create();
+        List<String> levels = new ArrayList<>();
+        List<String> path = new ArrayList<>();
+        var root = YamlObject.builder();
 
         try (LineNumberReader reader = new LineNumberReader(new InputStreamReader(inputStream))) {
             String line;
@@ -36,26 +38,24 @@ public final class YamlParser {
                 /**
                  * Ignore the weird start of YAML marker if there is one, or many... or whatever (as long as no value was added)
                  */
-                if(line.startsWith("---") && root.children().isEmpty()) {
+                if(line.startsWith("---") && root.isEmpty()) {
                     continue;
                 }
-                processLine(root, reader.getLineNumber(), line);
+                processLine(root, reader.getLineNumber(), line, levels, path);
             }
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read YAML file", e);
         }
-        return root;
+        return root.build();
     }
 
-    private static void processLine(YamlObject root, int lineNumber, String line) {
+    private static void processLine(YamlObject.Builder root, int lineNumber, String line, List<String> levels, List<String> path) {
         /**
          * Ignore blank lines
          */
         if (line.isBlank()) {
             return;
         }
-
-        var currentRoot = findRoot(root, line, lineNumber).orElse(root);
 
         var stripped = line.stripLeading();
 
@@ -66,30 +66,83 @@ public final class YamlParser {
             return;
         }
 
-        var separatorIndex = stripped.indexOf(":");
-
-        var key = separatorIndex == -1 ? stripped : stripped.substring(0, separatorIndex).trim();
         var spaces = extractSpaces(line);
+
+        String currentLevel = levels.isEmpty() ? "" : levels.getLast();
+
+        if(doesNotMatchAnyLowerLevel(root, levels, spaces) || startsNewLevelOnScalarNode(root, spaces)) {
+            throw new IllegalStateException("Spaces do not match on line " + lineNumber + " : " + line.trim());
+        }
+
+        root.unsetScalar();
+
+        while(spaces.length() < currentLevel.length() && !levels.isEmpty()) {
+            currentLevel = levels.removeLast();
+            path.removeLast();
+        }
+
+        var separatorIndex = stripped.indexOf(":");
+        var key = separatorIndex == -1 ? stripped : stripped.substring(0, separatorIndex).trim();
         var value = separatorIndex == -1 ? null : stripped.substring(separatorIndex + 1).trim();
+
+        if(value != null && value.isEmpty()) {
+            value = null;
+        }
 
         /**
          * Lists handled here
          */
         if(key.startsWith("- ")) {
-            var indexKey = currentRoot.childrenCount() + "";
+            var indexKey = root.countElements(YamlPath.of(path)) + "";
             var keyAfterListMarker = key.substring(1);
             if(value != null) { // List of composite (generates two nodes : 1 for the index, 1 for the key value pair)
-                addNode(currentRoot, spaces, indexKey, null);
-                currentRoot.lastChild().addComponent(Node.from(spaces + " " + extractSpaces(keyAfterListMarker), keyAfterListMarker.trim(), value));
+                levels.add(spaces);
+                path.add(indexKey);
+                spaces += " " + extractSpaces(keyAfterListMarker);
+                key = keyAfterListMarker;
             }
             else { // List of scalar nodes
-                addNode(currentRoot, spaces, indexKey, keyAfterListMarker.trim());
+                key = indexKey;
+                value = keyAfterListMarker;
             }
         }
-        else {
-            addNode(currentRoot, spaces, key, value);
+
+        if(value == null) {
+            levels.add(spaces);
+            path.add(extractStringValue(key));
         }
 
+        if(value != null){
+            YamlPath nodePath = YamlPath.of(path).append(extractStringValue(key));
+
+            if(root.containsNode(nodePath)) {
+                throw new IllegalStateException("A node is already defined for path " + nodePath + " at line " + lineNumber);
+            }
+
+            root.addNode(Node.from(nodePath, extractStringValue(value)));
+        }
+        root.spaces(spaces);
+    }
+
+    /**
+     * Tests if a new level is being created while the context was mapping scalar nodes
+     * @param root The context
+     * @param spaces The active spaces of this line
+     * @return true when a new unauthorized level is being created
+     */
+    private static boolean startsNewLevelOnScalarNode(YamlObject.Builder root, String spaces) {
+        return !root.previousSpaces().startsWith(spaces) && root.scalar();
+    }
+
+    /**
+     * Tests if the context does not fall back to any previously known level
+     * @param root The context
+     * @param levels The currently active levels
+     * @param spaces The active spaces of this line
+     * @return true if the context does not fall back to any previously known level
+     */
+    private static boolean doesNotMatchAnyLowerLevel(YamlObject.Builder root, List<String> levels, String spaces) {
+        return spaces.length() < root.previousSpaces().length() && !levels.contains(spaces);
     }
 
     /**
@@ -99,56 +152,6 @@ public final class YamlParser {
      */
     private static String extractSpaces(String line) {
         return line.substring(0, line.length() - line.stripLeading().length());
-    }
-
-    /**
-     * Finds the root where to place the current node.
-     * @param root The real root of our YAML object
-     * @param line
-     * @param lineNumber
-     * @return The node that should be used as root for this line
-     */
-    private static Optional<Composite> findRoot(YamlObject root, String line, int lineNumber) {
-
-        if (root.children().isEmpty() || line.stripLeading().equals(line)) {
-            return Optional.empty();
-        }
-
-        var currentRoot = root.children().getLast();
-
-        while(line.startsWith(currentRoot.spaces())) {
-            if (currentRoot.children().isEmpty()) {
-                return Optional.of(currentRoot);
-            }
-            Node nextRoot = currentRoot.children().getLast();
-            if(nextRoot.spaces().equals(extractSpaces(line))) {
-                return Optional.of(currentRoot);
-            }
-            currentRoot = nextRoot;
-        }
-        /**
-         * Strange YAML structure with incorrect tabs usually. There are probably more edge cases
-         */
-        throw new IllegalStateException("Syntax error on line " + lineNumber);
-    }
-
-    /**
-     * Add nodes and clean its data
-     * @param currentRoot
-     * @param spaces
-     * @param key
-     * @param value
-     */
-    private static void addNode(Composite currentRoot, String spaces, String key, String value) {
-        var extractedKey = extractStringValue(key);
-        var extractedValue = extractStringValue(value);
-
-        if(key.startsWith("-")) {
-            extractedKey = currentRoot.childrenCount() + "";
-            extractedValue = extractStringValue(extractedKey.substring(1));
-        }
-
-        currentRoot.addComponent(Node.from(spaces, extractedKey, extractedValue));
     }
 
     /**
