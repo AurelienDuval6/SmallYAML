@@ -93,7 +93,7 @@ public final class YamlParser {
          * Lists handled here
          */
         if(key.startsWith("- ")) {
-            var indexKey = root.countElements(YamlPath.of(path)) + "";
+            var indexKey = root.countElements(new YamlPath(path)) + "";
             var keyAfterListMarker = key.substring(1);
             if(value != null) { // List of composite (generates two nodes : 1 for the index, 1 for the key value pair)
                 levels.add(spaces);
@@ -113,13 +113,13 @@ public final class YamlParser {
         }
 
         if(value != null){
-            YamlPath nodePath = YamlPath.of(path).append(extractStringValue(key));
+            YamlPath nodePath = new YamlPath(path).append(extractStringValue(key));
 
             if(root.containsNode(nodePath)) {
                 throw new IllegalStateException("A node is already defined for path " + nodePath + " at line " + lineNumber);
             }
 
-            root.addNode(Node.from(nodePath, extractStringValue(value)));
+            root.addNode(new Node(nodePath, extractStringValue(value)));
         }
         root.spaces(spaces);
     }
