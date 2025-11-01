@@ -1,10 +1,11 @@
 ---
-data:
+data: # xxx
   - id: 1
     name: Franc
     roles:
       - admin
       - hr
+    test: t
   - id: 2
     name: John
     roles:

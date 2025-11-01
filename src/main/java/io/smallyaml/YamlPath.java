@@ -1,9 +1,6 @@
 package io.smallyaml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public record YamlPath(List<String> needles) {
 
@@ -12,7 +9,7 @@ public record YamlPath(List<String> needles) {
     }
 
     public static YamlPath of(List<String> needles) {
-        return new YamlPath(needles);
+        return new YamlPath(new ArrayList<>(needles));
     }
 
     public YamlPath append(String needle) {

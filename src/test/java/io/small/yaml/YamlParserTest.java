@@ -21,7 +21,7 @@ class YamlParserTest {
                     () -> assertYamlValue(object, YamlPath.of("database"), null),
                     () -> assertYamlValue(object, YamlPath.of("database", "driver"), "newdriver"),
                     () -> assertYamlValue(object, YamlPath.of("database", "port"), "6601"),
-                    () -> assertYamlValue(object, YamlPath.of("database", "dbname"), "'newdb'"),
+                    () -> assertYamlValue(object, YamlPath.of("database", "dbname"), "newdb"),
                     () -> assertYamlValue(object, YamlPath.of("database", "username"), "appuser"),
                     () -> assertYamlValue(object, YamlPath.of("database", "password"), "apppassword")
             );

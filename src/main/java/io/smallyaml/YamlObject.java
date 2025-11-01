@@ -55,7 +55,7 @@ public record YamlObject(List<Node> nodes) {
     /**
      * Friend class pattern to maintain the immutability of YamlObject records
      */
-    static class Builder {
+    public static class Builder {
         private final YamlObject object = new YamlObject(new ArrayList<>());
         private String previousSpaces = "";
         private boolean scalar = true;
