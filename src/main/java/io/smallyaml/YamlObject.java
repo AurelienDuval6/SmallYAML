@@ -1,6 +1,8 @@
 package io.smallyaml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Umbrella class to hide the inner mechanics of our YAML object.
@@ -37,18 +39,7 @@ public record YamlObject(List<Node> nodes) {
         return false;
     }
 
-    /**
-     * Counts the number of elements within this path
-     */
-    public int countElements(YamlPath path) {
-        Set<String> paths = new HashSet<>();
-        for(var node : nodes) {
-            path.directSubFolder(node.path()).ifPresent(paths::add);
-        }
-        return paths.size();
-    }
-
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
@@ -57,44 +48,17 @@ public record YamlObject(List<Node> nodes) {
      */
     public static class Builder {
         private final YamlObject object = new YamlObject(new ArrayList<>());
-        private String previousSpaces = "";
-        private boolean scalar = true;
 
         public void addNode(Node node) {
             object.nodes.add(node);
-            scalar = true;
         }
 
         public boolean containsNode(YamlPath path) {
             return object.exists(path);
         }
 
-        public int countElements(YamlPath path) {
-            return object.countElements(path);
-        }
-
-        public void spaces(String spaces) {
-            this.previousSpaces = spaces;
-        }
-
-        public String previousSpaces() {
-            return previousSpaces;
-        }
-
-        public boolean isEmpty() {
-            return object.nodes.isEmpty();
-        }
-
         public YamlObject build() {
             return object;
-        }
-
-        public boolean scalar() {
-            return scalar;
-        }
-
-        public void unsetScalar() {
-            scalar = false;
         }
     }
 }

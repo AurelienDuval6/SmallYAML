@@ -17,14 +17,6 @@ public class Parser {
     private final List<YamlObject> result = new ArrayList<>();
     private YamlObject.Builder builder = null;
 
-    public void initialize() {
-        resetIndentLevel();
-        clearKeys();
-        result.clear();
-        builder = null;
-        listIndex.clear();
-    }
-
     public void parse(Token token) {
         var handler = Handler.implementation(token.type());
         handler.handle(this, token);
@@ -53,9 +45,13 @@ public class Parser {
 
     public void addNode(Token token) {
         if(builder == null) {
-            builder = new YamlObject.Builder();
+            builder = YamlObject.builder();
         }
-        builder.addNode(Node.from(YamlPath.of(keys), token.value()));
+        var path = YamlPath.of(keys);
+        if(builder.containsNode(path)) {
+            throw new IllegalStateException("Duplicate keys are not allowed for path " + path);
+        }
+        builder.addNode(Node.from(path, token.value()));
     }
 
     public void buildObject() {
